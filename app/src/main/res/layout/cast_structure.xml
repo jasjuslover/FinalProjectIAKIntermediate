@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.v7.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/cardCast"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="16dp"
+    android:layout_marginLeft="2dp"
+    android:layout_marginRight="2dp"
+    android:layout_marginTop="16dp"
+    android:foreground="?android:selectableItemBackground">
+
+    <FrameLayout
+        android:id="@+id/cardRelative"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal">
+
+        <ImageView
+            android:id="@+id/closeUp"
+            android:layout_width="100dp"
+            android:layout_height="150dp"
+            android:adjustViewBounds="true"
+            android:scaleType="centerCrop"
+            android:src="@mipmap/ic_launcher" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:background="#96000000"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/textName"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:padding="5dp"
+                android:text="Name"
+                android:textAppearance="?android:textAppearanceLarge"
+                android:textColor="#ffffffff"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/textCharacter"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="5dp"
+                android:text="Character"
+                android:textAppearance="?android:textAppearanceLarge"
+                android:textColor="#ffffffff"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </FrameLayout>
+</android.support.v7.widget.CardView>

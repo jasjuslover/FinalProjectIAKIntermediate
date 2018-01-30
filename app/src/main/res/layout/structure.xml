@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.v7.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/cardLayout"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="2dp"
+    android:layout_marginLeft="2dp"
+    android:layout_marginRight="2dp"
+    android:layout_marginTop="2dp"
+    android:foreground="?android:selectableItemBackground">
+
+    <FrameLayout
+        android:id="@+id/cardRelative"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center_horizontal">
+
+        <ImageView
+            android:id="@+id/imageList"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:adjustViewBounds="true"
+            android:scaleType="center"
+            android:src="@mipmap/ic_launcher" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+
+            android:background="#96000000"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/textNamaFilm"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="5dp"
+                android:text="Judul"
+                android:textAppearance="?android:textAppearanceLarge"
+                android:textColor="#ffffffff"
+                android:textSize="13sp" />
+
+            <RatingBar
+                android:id="@+id/ratingMovie"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:numStars="5"
+                style="?attr/ratingBarStyleSmall"/>
+        </LinearLayout>
+    </FrameLayout>
+</android.support.v7.widget.CardView>
