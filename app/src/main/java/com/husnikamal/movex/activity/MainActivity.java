@@ -1,10 +1,9 @@
 package com.husnikamal.movex.activity;
 
-import android.app.Activity;
-import android.content.Context;
-import android.content.ContextWrapper;
 import android.content.res.Configuration;
 import android.os.Bundle;
+import android.support.design.widget.CoordinatorLayout;
+import android.support.design.widget.Snackbar;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.DefaultItemAnimator;
@@ -18,11 +17,9 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
-import android.widget.Toast;
 
 import com.husnikamal.movex.R;
 import com.husnikamal.movex.adapter.RecyclerAdapter;
-import com.husnikamal.movex.model.CastResponse;
 import com.husnikamal.movex.model.Movie;
 import com.husnikamal.movex.model.MovieResponse;
 import com.husnikamal.movex.network.Client;
@@ -53,6 +50,8 @@ public class MainActivity extends AppCompatActivity {
     ProgressBar progressSearch;
     @BindView(R.id.toolbarTitle)
     LinearLayout toolbarTitle;
+    @BindView(R.id.coordinator)
+    CoordinatorLayout coordinator;
 
     private List<Movie> movieList;
     public RecyclerAdapter adapter;
@@ -155,7 +154,7 @@ public class MainActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
-//    Initialize reciclerview when portrait and landscape. If screen is portrait, recyclerview will set to 2 columns, and set to 4 columns when landscape
+    //    Initialize reciclerview when portrait and landscape. If screen is portrait, recyclerview will set to 2 columns, and set to 4 columns when landscape
     private void init() {
         movieList = new ArrayList<>();
 //        RecyclerAdapter constructor need two identifier. Context and List
@@ -172,7 +171,7 @@ public class MainActivity extends AppCompatActivity {
         adapter.notifyDataSetChanged();
     }
 
-//    Method for load the movies. SEARCH_TASK for call searchMovie with apiKey and query, POPULAR_TASK for getPopular and NOW_PLAYING_TASK for getNowPlaying
+    //    Method for load the movies. SEARCH_TASK for call searchMovie with apiKey and query, POPULAR_TASK for getPopular and NOW_PLAYING_TASK for getNowPlaying
     private void loadMovies(int taskId, String text) {
         Client client = new Client();
         Service apiService = Client.getClient().create(Service.class);
@@ -196,9 +195,19 @@ public class MainActivity extends AppCompatActivity {
                 if (response.isSuccessful()) {
 //                    If app get response, progressBar will show
                     progressSearch.setVisibility(View.VISIBLE);
-                    recyclerView.setAdapter(new RecyclerAdapter(MainActivity.this, response.body().getResults()));
-                    swipeRefreshLayout.setRefreshing(false);
-                    progressSearch.setVisibility(View.INVISIBLE);
+                    if (response.body().getResults().size() == 0) {
+                        Snackbar snackbar = Snackbar
+                                .make(coordinator, "Movie not found", Snackbar.LENGTH_LONG)
+                                .setAction("OK", null);
+                        snackbar.show();
+                    } else {
+                        recyclerView.setAdapter(new RecyclerAdapter(MainActivity.this, response.body().getResults()));
+                        swipeRefreshLayout.setRefreshing(false);
+                        progressSearch.setVisibility(View.INVISIBLE);
+                    }
+//                    recyclerView.setAdapter(new RecyclerAdapter(MainActivity.this, response.body().getResults()));
+//                    swipeRefreshLayout.setRefreshing(false);
+//                    progressSearch.setVisibility(View.INVISIBLE);
                 }
             }
 
