@@ -19,4 +19,9 @@
         android:title="Now Playing"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/upcoming"
+        android:title="Upcoming"
+        app:showAsAction="never" />
+
 </menu>

@@ -37,7 +37,7 @@ import retrofit2.Response;
 
 public class MainActivity extends AppCompatActivity {
 
-    private final int SEARCH_TASK = 0, POPULAR_TASK = 1, NOW_PLAYING_TASK = 2;
+    private final int SEARCH_TASK = 0, POPULAR_TASK = 1, NOW_PLAYING_TASK = 2, UPCOMING_TASK = 3;
     private final String API_KEY = "dfe1a9fa143f0e48abfd687fbc950e49";
 
     public LinearLayoutManager layoutManager;
@@ -149,12 +149,15 @@ public class MainActivity extends AppCompatActivity {
         } else if (id == R.id.now_playing) {
             loadMovies(NOW_PLAYING_TASK, null);
             return true;
+        } else if (id == R.id.upcoming) {
+            loadMovies(UPCOMING_TASK, null);
+            return  true;
         }
 
         return super.onOptionsItemSelected(item);
     }
 
-    //    Initialize reciclerview when portrait and landscape. If screen is portrait, recyclerview will set to 2 columns, and set to 4 columns when landscape
+//        Initialize reciclerview when portrait and landscape. If screen is portrait, recyclerview will set to 2 columns, and set to 4 columns when landscape
     private void init() {
         movieList = new ArrayList<>();
 //        RecyclerAdapter constructor need two identifier. Context and List
@@ -171,7 +174,7 @@ public class MainActivity extends AppCompatActivity {
         adapter.notifyDataSetChanged();
     }
 
-    //    Method for load the movies. SEARCH_TASK for call searchMovie with apiKey and query, POPULAR_TASK for getPopular and NOW_PLAYING_TASK for getNowPlaying
+//        Method for load the movies. SEARCH_TASK for call searchMovie with apiKey and query, POPULAR_TASK for getPopular and NOW_PLAYING_TASK for getNowPlaying
     private void loadMovies(int taskId, String text) {
         Client client = new Client();
         Service apiService = Client.getClient().create(Service.class);
@@ -181,13 +184,16 @@ public class MainActivity extends AppCompatActivity {
                 responseCall = apiService.searchMovie(API_KEY, text);
                 break;
             case POPULAR_TASK:
-                responseCall = apiService.getPopular(API_KEY);
+                responseCall = apiService.getMovie("popular", API_KEY);
                 break;
             case NOW_PLAYING_TASK:
-                responseCall = apiService.getNowPlaying(API_KEY);
+                responseCall = apiService.getMovie("now_playing", API_KEY);
+                break;
+            case UPCOMING_TASK:
+                responseCall = apiService.getMovie("upcoming", API_KEY);
                 break;
             default:
-                responseCall = apiService.getPopular(API_KEY);
+                responseCall = apiService.getMovie("popular", API_KEY);
         }
         responseCall.enqueue(new Callback<MovieResponse>() {
             @Override
@@ -195,6 +201,8 @@ public class MainActivity extends AppCompatActivity {
                 if (response.isSuccessful()) {
 //                    If app get response, progressBar will show
                     progressSearch.setVisibility(View.VISIBLE);
+
+//                    If number of movie is zero, SnackBar will show
                     if (response.body().getResults().size() == 0) {
                         Snackbar snackbar = Snackbar
                                 .make(coordinator, "Movie not found", Snackbar.LENGTH_LONG)

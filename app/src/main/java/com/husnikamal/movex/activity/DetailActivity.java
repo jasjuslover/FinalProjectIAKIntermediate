@@ -78,6 +78,7 @@ public class DetailActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
 //        imageView.startAnimation(fadeoutAnim);
 
+//        Setting layout for Cast RecyclerView
         layoutManagers = new LinearLayoutManager(DetailActivity.this, LinearLayoutManager.HORIZONTAL, false);
         recyclerViewCast.setLayoutManager(layoutManagers);
 
