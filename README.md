@@ -5,4 +5,4 @@ Simple Android Movie App with API The Movie Database for Final Project Indonesia
 - RxJava
 - RxAndroid
 
-<img src="https://rawgit.com/husnikamal26/MovieAPITMDB/master/The%20Movie%20Database.png" align="center"/>
+<img src="https://rawcdn.githack.com/jasjuslover/FinalProjectIAKIntermediate/f25bc47bd1eb1440d5578543fe89ed1e450d41f6/The Movie Database.png" align="center"/>
