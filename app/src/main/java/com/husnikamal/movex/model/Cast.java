@@ -18,11 +18,6 @@ public class Cast {
 
     String baseImageUrl = "https://image.tmdb.org/t/p/w500";
 
-    public Cast(String name, String closeUp) {
-        this.name = name;
-        this.closeUp = closeUp;
-    }
-
     public String getCharacter() {
         return character;
     }

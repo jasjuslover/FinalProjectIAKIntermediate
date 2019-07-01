@@ -18,6 +18,7 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 
+import com.husnikamal.movex.BuildConfig;
 import com.husnikamal.movex.R;
 import com.husnikamal.movex.adapter.RecyclerAdapter;
 import com.husnikamal.movex.model.Movie;
@@ -31,6 +32,13 @@ import java.util.List;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
+import io.reactivex.Observer;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.functions.Function;
+import io.reactivex.observers.DisposableObserver;
+import io.reactivex.schedulers.Schedulers;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -38,7 +46,7 @@ import retrofit2.Response;
 public class MainActivity extends AppCompatActivity {
 
     private final int SEARCH_TASK = 0, POPULAR_TASK = 1, NOW_PLAYING_TASK = 2, UPCOMING_TASK = 3;
-    private final String API_KEY = "dfe1a9fa143f0e48abfd687fbc950e49";
+    private CompositeDisposable rxDisposable;
 
     public LinearLayoutManager layoutManager;
 
@@ -54,6 +62,7 @@ public class MainActivity extends AppCompatActivity {
     CoordinatorLayout coordinator;
 
     private List<Movie> movieList;
+    private String type;
     public RecyclerAdapter adapter;
 
     MaterialSearchView searchView;
@@ -66,63 +75,9 @@ public class MainActivity extends AppCompatActivity {
         ButterKnife.bind(this);
         setSupportActionBar(toolbar);
 
-        progressSearch.setVisibility(View.INVISIBLE);
-        searchView = (MaterialSearchView) findViewById(R.id.search_view);
-
-//        Set Layout to GridLayout and set column to 2.
-        layoutManager = new GridLayoutManager(getApplicationContext(), 2);
-        recyclerView.setHasFixedSize(true);
-        recyclerView.setLayoutManager(layoutManager);
-
-//        When screen swiping
-        swipeRefreshLayout = (SwipeRefreshLayout) findViewById(R.id.swipe_main);
-        swipeRefreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
-            @Override
-            public void onRefresh() {
-                init();
-                loadMovies(POPULAR_TASK, null);
-            }
-        });
-
-//        Initialize the recyclerview when portrait and landscape
         init();
 
-//        Load Popular Movies as default recyclerView
         loadMovies(POPULAR_TASK, null);
-
-//        Search Function (In Menu Bar)
-        searchView.setOnQueryTextListener(new MaterialSearchView.OnQueryTextListener() {
-            @Override
-            public boolean onQueryTextSubmit(String query) {
-//                When Text Submitted. Logging for test, is the text changed or not.
-                Log.d("onQueryTextSubmit", "" + query);
-                loadMovies(SEARCH_TASK, query);
-                return false;
-            }
-
-            @Override
-            public boolean onQueryTextChange(String newText) {
-//                When text changed. Logging for test, is the text changed or not.
-                Log.d("onQueryTextChange", "" + newText);
-                loadMovies(SEARCH_TASK, newText);
-                return false;
-            }
-        });
-
-//        Set View when MaterialSearch is show and close
-        searchView.setOnSearchViewListener(new MaterialSearchView.SearchViewListener() {
-            @Override
-            public void onSearchViewShown() {
-                //Do some magic
-                toolbarTitle.setVisibility(View.INVISIBLE);
-            }
-
-            @Override
-            public void onSearchViewClosed() {
-                //Do some magic
-                toolbarTitle.setVisibility(View.VISIBLE);
-            }
-        });
     }
 
     @Override
@@ -151,17 +106,21 @@ public class MainActivity extends AppCompatActivity {
             return true;
         } else if (id == R.id.upcoming) {
             loadMovies(UPCOMING_TASK, null);
-            return  true;
+            return true;
         }
 
         return super.onOptionsItemSelected(item);
     }
 
-//        Initialize reciclerview when portrait and landscape. If screen is portrait, recyclerview will set to 2 columns, and set to 4 columns when landscape
     private void init() {
         movieList = new ArrayList<>();
-//        RecyclerAdapter constructor need two identifier. Context and List
+        rxDisposable = new CompositeDisposable();
         adapter = new RecyclerAdapter(this, movieList);
+        type = "popular";
+        progressSearch.setVisibility(View.INVISIBLE);
+
+        searchView = (MaterialSearchView) findViewById(R.id.search_view);
+        swipeRefreshLayout = (SwipeRefreshLayout) findViewById(R.id.swipe_main);
 
         if (this.getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT) {
             recyclerView.setLayoutManager(new GridLayoutManager(this, 2));
@@ -169,79 +128,178 @@ public class MainActivity extends AppCompatActivity {
             recyclerView.setLayoutManager(new GridLayoutManager(this, 4));
         }
 
+        layoutManager = new GridLayoutManager(getApplicationContext(), 2);
+        recyclerView.setHasFixedSize(true);
+        recyclerView.setLayoutManager(layoutManager);
         recyclerView.setItemAnimator(new DefaultItemAnimator());
         recyclerView.setAdapter(adapter);
-        adapter.notifyDataSetChanged();
+
+        initSwipeListener();
+        initSearchListener();
     }
 
-//        Method for load the movies. SEARCH_TASK for call searchMovie with apiKey and query, POPULAR_TASK for getPopular and NOW_PLAYING_TASK for getNowPlaying
-    private void loadMovies(int taskId, String text) {
-        Client client = new Client();
-        Service apiService = Client.getClient().create(Service.class);
-        Call<MovieResponse> responseCall;
-        switch (taskId) {
-            case SEARCH_TASK:
-                responseCall = apiService.searchMovie(API_KEY, text);
-                break;
-            case POPULAR_TASK:
-                responseCall = apiService.getMovie("popular", API_KEY);
-                break;
-            case NOW_PLAYING_TASK:
-                responseCall = apiService.getMovie("now_playing", API_KEY);
-                break;
-            case UPCOMING_TASK:
-                responseCall = apiService.getMovie("upcoming", API_KEY);
-                break;
-            default:
-                responseCall = apiService.getMovie("popular", API_KEY);
-        }
-        responseCall.enqueue(new Callback<MovieResponse>() {
+    private void initSwipeListener() {
+        swipeRefreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
             @Override
-            public void onResponse(Call<MovieResponse> call, Response<MovieResponse> response) {
-                if (response.isSuccessful()) {
-//                    If app get response, progressBar will show
-                    progressSearch.setVisibility(View.VISIBLE);
-
-//                    If number of movie is zero, SnackBar will show
-                    if (response.body().getResults().size() == 0) {
-                        Snackbar snackbar = Snackbar
-                                .make(coordinator, "Movie not found", Snackbar.LENGTH_LONG)
-                                .setAction("OK", null);
-                        snackbar.show();
-                    } else {
-                        recyclerView.setAdapter(new RecyclerAdapter(MainActivity.this, response.body().getResults()));
-                        swipeRefreshLayout.setRefreshing(false);
-                        progressSearch.setVisibility(View.INVISIBLE);
-                    }
-//                    recyclerView.setAdapter(new RecyclerAdapter(MainActivity.this, response.body().getResults()));
-//                    swipeRefreshLayout.setRefreshing(false);
-//                    progressSearch.setVisibility(View.INVISIBLE);
-                }
-            }
-
-            @Override
-            public void onFailure(Call<MovieResponse> call, Throwable t) {
-                Log.d("Data", "" + t.getMessage());
+            public void onRefresh() {
+                init();
+                loadMovies(POPULAR_TASK, null);
             }
         });
     }
 
+    private void initSearchListener() {
+        searchView.setOnQueryTextListener(new MaterialSearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                Log.d("onQueryTextSubmit", "" + query);
+                searchMovies(query);
+                return false;
+            }
 
-//        responseCall.enqueue(new Callback<MovieResponse>() {
-//            @Override
-//            public void onResponse(Call<MovieResponse> call, Response<MovieResponse> response) {
-//                if (response.isSuccessful()) {
-////                    If app get response, progressBar will show
-//                    progressSearch.setVisibility(View.VISIBLE);
-//                    recyclerView.setAdapter(new RecyclerAdapter(MainActivity.this, response.body().getResults()));
-//                    swipeRefreshLayout.setRefreshing(false);
-//                    progressSearch.setVisibility(View.INVISIBLE);
-//                }
-//            }
-//
-//            @Override
-//            public void onFailure(Call<MovieResponse> call, Throwable t) {
-//                Log.d("Data", "" + t.getMessage());
-//            }
-//        });
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                Log.d("onQueryTextChange", "" + newText);
+                searchMovies(newText);
+                return false;
+            }
+        });
+
+        searchView.setOnSearchViewListener(new MaterialSearchView.SearchViewListener() {
+            @Override
+            public void onSearchViewShown() {
+                //Do some magic
+                toolbarTitle.setVisibility(View.INVISIBLE);
+            }
+
+            @Override
+            public void onSearchViewClosed() {
+                //Do some magic
+                toolbarTitle.setVisibility(View.VISIBLE);
+            }
+        });
+    }
+
+    private void loadMovies(int taskId, String text) {
+        switch (taskId) {
+            case SEARCH_TASK:
+                searchMovies(text);
+                break;
+            case POPULAR_TASK:
+                refreshList();
+                loadMovies("popular");
+                break;
+            case NOW_PLAYING_TASK:
+                refreshList();
+                loadMovies("now_playing");
+                break;
+            case UPCOMING_TASK:
+                refreshList();
+                loadMovies("upcoming");
+                break;
+            default:
+                refreshList();
+                loadMovies("popular");
+        }
+    }
+
+    private void refreshList() {
+        movieList.clear();
+        adapter.notifyDataSetChanged();
+    }
+
+    private void loadMovies(String type) {
+        Client.getService().getMovie(type, BuildConfig.API_KEY)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Observer<MovieResponse>() {
+                    @Override
+                    public void onSubscribe(Disposable d) {
+                        rxDisposable.add(d);
+                    }
+
+                    @Override
+                    public void onNext(MovieResponse movieResponse) {
+                        if (movieResponse != null) {
+                            if (movieResponse.getResults() != null) {
+                                if (movieResponse.getResults().size() == 0) {
+                                    Snackbar snackbar = Snackbar
+                                            .make(coordinator, "Movie not found", Snackbar.LENGTH_LONG)
+                                            .setAction("OK", null);
+                                    snackbar.show();
+                                } else {
+                                    for (Movie m : movieResponse.getResults()) {
+                                        movieList.add(m);
+                                    }
+                                }
+
+                                adapter.notifyDataSetChanged();
+                                swipeRefreshLayout.setRefreshing(false);
+                                progressSearch.setVisibility(View.GONE);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+
+                    }
+
+                    @Override
+                    public void onComplete() {
+
+                    }
+                });
+    }
+
+    private void searchMovies(String text) {
+        Client.getService().searchMovie(BuildConfig.API_KEY, text)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Observer<MovieResponse>() {
+                    @Override
+                    public void onSubscribe(Disposable d) {
+                        rxDisposable.add(d);
+                    }
+
+                    @Override
+                    public void onNext(MovieResponse movieResponse) {
+                        if (movieResponse != null) {
+                            if (movieResponse.getResults() != null) {
+                                if (movieResponse.getResults().size() == 0) {
+                                    Snackbar snackbar = Snackbar
+                                            .make(coordinator, "Movie not found", Snackbar.LENGTH_LONG)
+                                            .setAction("OK", null);
+                                    snackbar.show();
+                                } else {
+                                    movieList.clear();
+                                    for (Movie m : movieResponse.getResults()) {
+                                        movieList.add(m);
+                                    }
+                                }
+
+                                adapter.notifyDataSetChanged();
+                                swipeRefreshLayout.setRefreshing(false);
+                                progressSearch.setVisibility(View.GONE);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+
+                    }
+
+                    @Override
+                    public void onComplete() {
+
+                    }
+                });
+    }
+
+    @Override
+    protected void onDestroy() {
+        rxDisposable.clear();
+        super.onDestroy();
+    }
 }

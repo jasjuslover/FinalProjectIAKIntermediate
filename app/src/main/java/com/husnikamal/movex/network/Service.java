@@ -4,6 +4,7 @@ import com.husnikamal.movex.model.CastResponse;
 import com.husnikamal.movex.model.MovieResponse;
 import com.husnikamal.movex.model.TrailerResponse;
 
+import io.reactivex.Observable;
 import retrofit2.Call;
 import retrofit2.http.GET;
 import retrofit2.http.Path;
@@ -16,14 +17,14 @@ import retrofit2.http.Query;
 public interface Service {
 
     @GET("movie/{type}")
-    Call<MovieResponse> getMovie(@Path("type") String type, @Query("api_key") String API_KEY);
+    Observable<MovieResponse> getMovie(@Path("type") String type, @Query("api_key") String API_KEY);
 
     @GET("search/movie")
-    Call<MovieResponse> searchMovie(@Query("api_key") String API_KEY, @Query("query") String MOVIE_NAME);
+    Observable<MovieResponse> searchMovie(@Query("api_key") String API_KEY, @Query("query") String MOVIE_NAME);
 
     @GET("movie/{id}/credits")
-    Call<CastResponse> getCast(@Path("id") int id, @Query("api_key") String apiKey);
+    Observable<CastResponse> getCast(@Path("id") int id, @Query("api_key") String apiKey);
 
     @GET("movie/{movie_id}/videos")
-    Call<TrailerResponse> getTrailers(@Path("movie_id") int mId, @Query("api_key") String apiKey);
+    Observable<TrailerResponse> getTrailers(@Path("movie_id") int mId, @Query("api_key") String apiKey);
 }

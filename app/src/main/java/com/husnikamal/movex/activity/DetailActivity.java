@@ -16,11 +16,13 @@ import android.widget.ImageView;
 import android.widget.RatingBar;
 import android.widget.TextView;
 
+import com.husnikamal.movex.BuildConfig;
 import com.husnikamal.movex.R;
 import com.husnikamal.movex.adapter.CastAdapter;
 import com.husnikamal.movex.adapter.TrailerAdapter;
 import com.husnikamal.movex.model.Cast;
 import com.husnikamal.movex.model.CastResponse;
+import com.husnikamal.movex.model.Trailer;
 import com.husnikamal.movex.model.TrailerResponse;
 import com.husnikamal.movex.network.Client;
 import com.husnikamal.movex.network.Service;
@@ -31,19 +33,19 @@ import java.util.List;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
+import io.reactivex.Observer;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.schedulers.Schedulers;
 
 public class DetailActivity extends AppCompatActivity {
 
     private static final String API_KEY = "dfe1a9fa143f0e48abfd687fbc950e49";
+    private CompositeDisposable rxDisposable;
+
     @BindView(R.id.recyclerViewTrailer)
     RecyclerView recyclerViewTrailer;
-    private List<Cast> castList;
-    private CastAdapter castAdapter;
-    private LinearLayoutManager layoutManagers, layoutTrailerManager;
-
     @BindView(R.id.backdrop)
     ImageView backdrop;
     @BindView(R.id.app_bar)
@@ -69,6 +71,12 @@ public class DetailActivity extends AppCompatActivity {
     @BindView(R.id.recyclerViewCast)
     RecyclerView recyclerViewCast;
 
+    private List<Cast> castList;
+    private List<Trailer> trailerList;
+    private CastAdapter castAdapter;
+    private TrailerAdapter trailerAdapter;
+    private LinearLayoutManager layoutManagers, layoutTrailerManager;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -76,32 +84,17 @@ public class DetailActivity extends AppCompatActivity {
         ButterKnife.bind(this);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-//        imageView.startAnimation(fadeoutAnim);
 
-//        Setting layout for Cast RecyclerView
-        layoutManagers = new LinearLayoutManager(DetailActivity.this, LinearLayoutManager.HORIZONTAL, false);
-        recyclerViewCast.setLayoutManager(layoutManagers);
+        init();
+    }
 
-        layoutTrailerManager = new GridLayoutManager(DetailActivity.this, 1);
-        recyclerViewTrailer.setLayoutManager(layoutTrailerManager);
+    private void init() {
+        castList = new ArrayList<>();
+        trailerList = new ArrayList<>();
+        rxDisposable = new CompositeDisposable();
 
-        appBar.addOnOffsetChangedListener(new AppBarLayout.OnOffsetChangedListener() {
-            @Override
-            public void onOffsetChanged(AppBarLayout appBarLayout, int verticalOffset) {
-                if (Math.abs(verticalOffset) == appBar.getTotalScrollRange()) {
-//                    Collapsed
-                    posterPath.setVisibility(View.INVISIBLE);
-                } else if (verticalOffset == 0) {
-//                    Expanded
-                    posterPath.setVisibility(View.VISIBLE);
-                } else {
-//                    Between
-                    posterPath.setVisibility(View.INVISIBLE);
-                }
-            }
-        });
+        initAppBarScrollListener();
 
-        Intent intentGetter = getIntent();
         int id;
         String movieName, thumbnail, poster, overView, release;
         Double popularity;
@@ -117,7 +110,9 @@ public class DetailActivity extends AppCompatActivity {
         popularity = getIntent().getExtras().getDouble("textPopularity");
         release = getIntent().getExtras().getString("textRelease");
         overView = getIntent().getExtras().getString("overview");
-//        rateStars = getIntent().getExtras().getFloat("voteAverages");
+
+        loadCast(id);
+        loadTrailer(id);
 
         Log.i("Backdrop ", "" + thumbnail);
 
@@ -136,64 +131,109 @@ public class DetailActivity extends AppCompatActivity {
         textRelease.setText(release);
         textOverview.setText(overView);
         ratingVal.setRating(rateStars);
-        initCast();
-        loadCast(id);
-        loadTrailer(id);
-    }
 
-    private void initCast() {
-        castList = new ArrayList<>();
-//        RecyclerAdapter constructor need two identifier. Context and List
         castAdapter = new CastAdapter(this, castList);
-        recyclerViewCast.setLayoutManager(new LinearLayoutManager(DetailActivity.this, LinearLayoutManager.HORIZONTAL, false));
-
+        layoutManagers = new LinearLayoutManager(DetailActivity.this, LinearLayoutManager.HORIZONTAL, false);
+        recyclerViewCast.setLayoutManager(layoutManagers);
         recyclerViewCast.setItemAnimator(new DefaultItemAnimator());
         recyclerViewCast.setAdapter(castAdapter);
-        castAdapter.notifyDataSetChanged();
+
+        trailerAdapter = new TrailerAdapter(DetailActivity.this, trailerList);
+
+        layoutTrailerManager = new GridLayoutManager(DetailActivity.this, 1);
+        recyclerViewTrailer.setLayoutManager(layoutTrailerManager);
+    }
+
+    private void initAppBarScrollListener() {
+        appBar.addOnOffsetChangedListener(new AppBarLayout.OnOffsetChangedListener() {
+            @Override
+            public void onOffsetChanged(AppBarLayout appBarLayout, int verticalOffset) {
+                if (Math.abs(verticalOffset) == appBar.getTotalScrollRange()) {
+                    posterPath.setVisibility(View.INVISIBLE);
+                } else if (verticalOffset == 0) {
+                    posterPath.setVisibility(View.VISIBLE);
+                } else {
+                    posterPath.setVisibility(View.INVISIBLE);
+                }
+            }
+        });
     }
 
     private void loadCast(int id) {
-        Client client = new Client();
-        Service apiService = Client.getClient().create(Service.class);
-        Call<CastResponse> castResponse = apiService.getCast(id, API_KEY);
-        castResponse.enqueue(new Callback<CastResponse>() {
-            @Override
-            public void onResponse(Call<CastResponse> call, Response<CastResponse> response) {
-                if (response.isSuccessful()) {
-                    Log.d("Response ", "" + response.code());
-                    Log.d("Data ", "" + response.body().getCasts());
-                    recyclerViewCast.setAdapter(new CastAdapter(DetailActivity.this, response.body().getCasts()));
-//                    recyclerView.setAdapter(new RecyclerAdapter(MainActivity.this, response.body().getResults()));
-                }
-            }
+        Client.getService().getCast(id, BuildConfig.API_KEY)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Observer<CastResponse>() {
+                    @Override
+                    public void onSubscribe(Disposable d) {
+                        rxDisposable.add(d);
+                    }
 
-            @Override
-            public void onFailure(Call<CastResponse> call, Throwable t) {
+                    @Override
+                    public void onNext(CastResponse castResponse) {
+                        if (castResponse != null) {
+                            if (castResponse.getCasts() != null) {
+                                if (castResponse.getCasts().size() == 0) {
+                                    // if cast size is 0
+                                } else {
+                                    for (Cast c : castResponse.getCasts()) {
+                                        castList.add(c);
+                                    }
 
-            }
-        });
+                                    castAdapter.notifyDataSetChanged();
+                                }
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+
+                    }
+
+                    @Override
+                    public void onComplete() {
+
+                    }
+                });
     }
 
     private void loadTrailer(int id) {
-        Client client = new Client();
-        Service apiService = Client.getClient().create(Service.class);
-        Call<TrailerResponse> trailerResponse = apiService.getTrailers(id, API_KEY);
-        trailerResponse.enqueue(new Callback<TrailerResponse>() {
-            @Override
-            public void onResponse(Call<TrailerResponse> call, Response<TrailerResponse> response) {
-                if (response.isSuccessful()) {
-                    int status = response.code();
-                    Log.d("Response Trailer ", "" + status);
-                    Log.d("Data ", "" + response.body().getResults());
-                    recyclerViewTrailer.setAdapter(new TrailerAdapter(DetailActivity.this, response.body().getResults()));
-                    Log.d("Adapter ", "RecyclerView Adapter Seted");
-                }
-            }
+        Client.getService().getTrailers(id, BuildConfig.API_KEY)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Observer<TrailerResponse>() {
+                    @Override
+                    public void onSubscribe(Disposable d) {
+                        rxDisposable.add(d);
+                    }
 
-            @Override
-            public void onFailure(Call<TrailerResponse> call, Throwable t) {
+                    @Override
+                    public void onNext(TrailerResponse trailerResponse) {
+                        if (trailerResponse != null) {
+                            if (trailerResponse.getResults() != null) {
+                                if (trailerResponse.getResults().size() == 0) {
+                                    // if size is 0
+                                } else {
+                                    for (Trailer t : trailerResponse.getResults()) {
+                                        trailerList.add(t);
+                                    }
 
-            }
-        });
+                                    trailerAdapter.notifyDataSetChanged();
+                                }
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+
+                    }
+
+                    @Override
+                    public void onComplete() {
+
+                    }
+                });
     }
 }
